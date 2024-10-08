@@ -138,7 +138,7 @@ sudo chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server with user $OE_USER ===="
-sudo su - $OE_USER -c "git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/"
+sudo su - $OE_USER -c "rm -rf $OE_HOME_EXT/ && git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/"
 
 # Create a Python virtual environment
 sudo su - $OE_USER -c "python3.11 -m venv $OE_USER-venv"
