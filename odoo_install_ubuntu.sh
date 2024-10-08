@@ -144,6 +144,8 @@ sudo su - $OE_USER -c "git clone --depth 1 --branch $OE_VERSION https://www.gith
 sudo su - $OE_USER -c "python3.11 -m venv $OE_USER-venv"
 
 su - $OE_USER
+
+# create ans swith to Python virtual environment
 source $OE_USER-venv/bin/activate
 pip install wheel setuptools pip --upgrade
 pip install psycopg2 python-ldap
@@ -151,6 +153,9 @@ pip install psycopg2 python-ldap
 echo -e "\n---- Install python packages/requirements ----"
 pip install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 
+#close Python virtual environment
+deactivate
+#back to previous user
 exit
 
 if [ "$IS_ENTERPRISE" = "True" ]; then
