@@ -143,10 +143,10 @@ sudo su - $OE_USER -c "rm -rf $OE_HOME_EXT/ && git clone --depth 1 --branch $OE_
 # Create a Python virtual environment
 sudo su - $OE_USER -c "python3.11 -m venv $OE_USER-venv"
 
-su - $OE_USER
+su - $OE_USER  <<EOF
 
 # create ans swith to Python virtual environment
-source $OE_USER-venv/bin/activate
+source $OE_HOME/$OE_USER-venv/bin/activate
 pip install wheel setuptools pip --upgrade
 pip install psycopg2 python-ldap
 
@@ -156,7 +156,7 @@ pip install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 #close Python virtual environment
 deactivate
 #back to previous user
-exit
+EOF 
 
 if [ "$IS_ENTERPRISE" = "True" ]; then
     sudo su - $OE_USER -c "mkdir -p $OE_HOME/enterprise/addons"
