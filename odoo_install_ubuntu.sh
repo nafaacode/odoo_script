@@ -143,7 +143,7 @@ sudo su - $OE_USER -c "rm -rf $OE_HOME_EXT/ && git clone --depth 1 --branch $OE_
 # Create a Python virtual environment
 sudo su - $OE_USER -c "python3.11 -m venv $OE_USER-venv"
 
-su - $OE_USER  <<EOF
+sudo su - $OE_USER <<EOF
 
 # create ans swith to Python virtual environment
 source $OE_HOME/$OE_USER-venv/bin/activate
@@ -153,10 +153,13 @@ pip install psycopg2 python-ldap
 echo -e "\n---- Install python packages/requirements ----"
 pip install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 
+echo -e "\n---- Create custom module directory ----"
+mkdir -p $OE_HOME/custom/addons
+
 #close Python virtual environment
 deactivate
-#back to previous user
-EOF 
+
+EOF
 
 if [ "$IS_ENTERPRISE" = "True" ]; then
     sudo su - $OE_USER -c "mkdir -p $OE_HOME/enterprise/addons"
@@ -165,9 +168,6 @@ if [ "$IS_ENTERPRISE" = "True" ]; then
     sudo npm install -g less
     sudo npm install -g less-plugin-clean-css
 fi
-
-echo -e "\n---- Create custom module directory ----"
-sudo su - $OE_USER -c "mkdir -p $OE_HOME/custom/addons"
 
 echo -e "\n---- Setting permissions on home folder ----"
 sudo chown -R $OE_USER:$OE_USER $OE_HOME/*
