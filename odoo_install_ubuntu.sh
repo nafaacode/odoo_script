@@ -190,6 +190,7 @@ sudo chmod 640 /etc/${OE_CONFIG}.conf
 
 #--------------------------------------------------
 # Adding ODOO as a daemon
+# /home/odoo17/odoo17-venv/bin/python3 /home/odoo17/odoo17-server/odoo-bin -c /etc/odoo17.conf
 #--------------------------------------------------
 echo -e "* Create init file"
 cat <<EOF | sudo tee /etc/init.d/$OE_CONFIG
@@ -205,8 +206,8 @@ cat <<EOF | sudo tee /etc/init.d/$OE_CONFIG
 USER=$OE_USER
 HOME=$OE_HOME
 PIDFILE=/var/run/\$USER/\$OE_CONFIG.pid
-DAEMON=$OE_HOME_EXT/odoo-bin
-DAEMON_OPTS="-c /etc/$OE_CONFIG.conf"
+DAEMON=$OE_HOME/$OE_USER-venv/bin/python3
+DAEMON_OPTS="$OE_HOME_EXT/odoo-bin -c /etc/$OE_CONFIG.conf"
 
 test -d /var/run/\$USER || mkdir -p /var/run/\$USER
 chown \$USER:\$USER /var/run/\$USER
@@ -278,6 +279,12 @@ fi
 #--------------------------------------------------
 echo -e "\n---- Starting Odoo Server ----"
 sudo service $OE_CONFIG start
+
+if ss -tuln | grep -q ':$OE_PORT'; then
+  echo "Odoo is running and listening on port: $OE_PORT"
+else
+  echo "Odoo failed to start or is not listening on port: $OE_PORT"
+fi
 
 #--------------------------------------------------
 # End of script
