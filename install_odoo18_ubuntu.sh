@@ -22,8 +22,9 @@ INSTALL_POSTGRESQL_FOURTEEN="True"  # Install PostgreSQL V14
 INSTALL_NGINX="False"  # Set to True if you want to install Nginx
 MAJOR_VERSION=${OE_VERSION%%.*}
 OE_USER="odoo${MAJOR_VERSION}"
-OE_HOME="/home/$OE_USER"
-OE_HOME_EXT="$OE_HOME/${OE_USER}-server"
+OE_HOME="/opt/$OE_USER"
+#OE_HOME_EXT="$OE_HOME/${OE_USER}-server"
+OE_HOME_EXT="$OE_HOME"
 INSTALL_WKHTMLTOPDF="True"  # Set to true if you want to install Wkhtmltopdf
 OE_PORT="8069"  # Default Odoo port
 IS_ENTERPRISE="False"  # Set to True if you want to install the Odoo enterprise version
@@ -68,18 +69,33 @@ sudo -i -u postgres createuser --createdb --username postgres --no-createrole --
 # Create a system user for Odoo and install Git to clone the Odoo source code
 sudo adduser --system --home=$OE_HOME --group $OE_USER
 sudo apt-get install -y git
-sudo -i -u $OE_USER git clone https://www.github.com/odoo/odoo --depth 1 --branch $OE_VERSION --single-branch $OE_HOME_EXT
+
+echo -e "\n==== Installing ODOO Server with user $OE_USER ===="
+sudo su - $OE_USER -c "git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/"
 
 # Install Python virtual environment and set up the Odoo environment
 echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
 sudo apt install -y python3-venv
 sudo python3 -m venv $OE_HOME_EXT/venv
 
+# Restart services using outdated libraries
+echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
+sudo systemctl restart packagekit.service
+sudo systemctl restart polkit.service
+sudo systemctl restart ssh.service
+sudo systemctl restart systemd-journald.service
+sudo systemctl restart systemd-manager
+sudo systemctl restart systemd-networkd.service
+sudo systemctl restart systemd-resolved.service
+sudo systemctl restart systemd-timesyncd.service
+sudo systemctl restart systemd-udevd.service
+
+
 # Activate the virtual environment and install required Python packages
 echo -e "\n---- Activate the virtual environment and install required Python packages ----"
 cd $OE_HOME_EXT/
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 
 # Install wkhtmltopdf and resolve any missing dependencies
 if [ "$INSTALL_WKHTMLTOPDF" = "True" ]; then
