@@ -23,8 +23,7 @@ INSTALL_NGINX="False"  # Set to True if you want to install Nginx
 MAJOR_VERSION=${OE_VERSION%%.*}
 OE_USER="odoo${MAJOR_VERSION}"
 OE_HOME="/opt/$OE_USER"
-#OE_HOME_EXT="$OE_HOME/${OE_USER}-server"
-OE_HOME_EXT="$OE_HOME"
+OE_HOME_EXT="$OE_HOME/${OE_USER}-server"
 INSTALL_WKHTMLTOPDF="True"  # Set to true if you want to install Wkhtmltopdf
 OE_PORT="8069"  # Default Odoo port
 IS_ENTERPRISE="False"  # Set to True if you want to install the Odoo enterprise version
@@ -64,10 +63,13 @@ sudo apt-get install -y node-less
 # Install PostgreSQL and create a new user for Odoo
 echo -e "\n---- Install PostgreSQL and create a new user for Odoo ----"
 sudo apt-get install -y postgresql
-sudo -i -u postgres createuser --createdb --username postgres --no-createrole --superuser --pwprompt $OE_USER
+sudo  su - postgres -c "createuser --createdb --username postgres --no-createrole --superuser --pwprompt $OE_USER" 2> /dev/null || true
 
 # Create a system user for Odoo and install Git to clone the Odoo source code
-sudo adduser --system --home=$OE_HOME --group $OE_USER
+sudo adduser --system --quiet --shell=/bin/bash --home=$OE_HOME --gecos 'ODOO' --group $OE_USER
+#The user should also be added to the sudo'ers group.
+sudo adduser $OE_USER sudo
+
 sudo apt-get install -y git
 
 echo -e "\n==== Installing ODOO Server with user $OE_USER ===="
@@ -84,7 +86,6 @@ sudo systemctl restart packagekit.service
 sudo systemctl restart polkit.service
 sudo systemctl restart ssh.service
 sudo systemctl restart systemd-journald.service
-sudo systemctl restart systemd-manager
 sudo systemctl restart systemd-networkd.service
 sudo systemctl restart systemd-resolved.service
 sudo systemctl restart systemd-timesyncd.service
