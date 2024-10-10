@@ -180,10 +180,7 @@ EOF"
 sudo chmod 755 /etc/systemd/system/${OE_CONFIG}.service
 sudo chown root: /etc/systemd/system/${OE_CONFIG}.service
 
-echo -e "\n---- Start the Odoo service ----"
-# Start the Odoo service
-sudo systemctl start ${OE_CONFIG}.service
-sudo systemctl enable ${OE_CONFIG}.service
+
 
 if ss -tuln | grep -q ':$OE_PORT'; then
   echo "Odoo ${OE_VERSION} installation completed. Access Odoo from your browser at http://your_IP_address:${OE_PORT}"
@@ -191,3 +188,27 @@ else
   echo "Odoo failed to start or is not listening on port: $OE_PORT"
 fi
 
+# Reload systemd and enable the service
+sudo systemctl daemon-reload
+sudo systemctl enable ${OE_CONFIG}.service
+
+# Start the Odoo service
+echo -e "\n---- Start the Odoo service ----"
+sudo systemctl start ${OE_CONFIG}.service
+
+sleep 5
+
+# Check the status of the Odoo service
+if ! sudo systemctl status ${OE_CONFIG}.service | grep -q "running"; then
+    echo "Odoo failed to start. Check the logs for more details."
+    exit 1
+fi
+
+
+# Final check for listening port
+if ss -tuln | grep -q ":$OE_PORT"; then
+  echo "Odoo ${OE_VERSION} installation completed. Access Odoo from your browser at http://your_IP_address:${OE_PORT}"
+else
+  echo "Odoo failed to start or is not listening on port: $OE_PORT"
+  exit 1
+fi
