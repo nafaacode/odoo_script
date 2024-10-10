@@ -136,6 +136,7 @@ if [ $GENERATE_RANDOM_PASSWORD = "True" ]; then
     echo -e "* Generating random admin password"
     OE_SUPERADMIN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
 fi
+
 # Configure the Odoo instance
 sudo cp $OE_HOME_EXT/debian/odoo.conf /etc/${OE_CONFIG}.conf
 sudo bash -c "cat << EOF > /etc/${OE_CONFIG}.conf
@@ -150,6 +151,23 @@ addons_path = $OE_HOME_EXT/addons
 default_productivity_apps = True
 logfile = /var/log/odoo/${OE_CONFIG}.log
 EOF"
+
+# Replace http_port ou xmlrpc_port 
+if [ "$OE_VERSION" > "11.0" ]; then
+    # Replace or add http_port
+    sudo sed -i "/^http_port/c\http_port = $OE_PORT" /etc/${OE_CONFIG}.conf || echo "http_port = $OE_PORT" | sudo tee -a /etc/${OE_CONFIG}.conf
+else
+    # Replace or add xmlrpc_port
+    sudo sed -i "/^xmlrpc_port/c\xmlrpc_port = $OE_PORT" /etc/${OE_CONFIG}.conf || echo "xmlrpc_port = $OE_PORT" | sudo tee -a /etc/${OE_CONFIG}.conf
+fi
+
+if [ $IS_ENTERPRISE = "True" ]; then
+    # Replace or add  
+    sudo sed -i "/^addons_path/c\addons_path = ${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons" /etc/${OE_CONFIG}.conf || echo "addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons" | sudo tee -a /etc/${OE_CONFIG}.conf
+    sudo su root -c "printf 'addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons\n' >> /etc/${OE_CONFIG}.conf"
+else
+    sudo sed -i "/^addons_path/c\addons_path = ${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons" /etc/${OE_CONFIG}.conf || echo "addons_path = ${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons" | sudo tee -a /etc/${OE_CONFIG}.conf
+fi
 
 echo -e "\n---- Set correct permissions on the Odoo configuration file ----"
 # Set correct permissions on the Odoo configuration file
@@ -166,11 +184,13 @@ sudo bash -c "cat << EOF > /etc/systemd/system/${OE_CONFIG}.service
 [Unit]
 Description=Odoo
 Documentation=http://www.odoo.com
+After=network.target
 
 [Service]
 Type=simple
 User=$OE_USER
 ExecStart=$OE_HOME_EXT/venv/bin/python3 $OE_HOME_EXT/odoo-bin -c /etc/${OE_CONFIG}.conf
+Restart=always
 
 [Install]
 WantedBy=default.target
@@ -180,13 +200,6 @@ EOF"
 sudo chmod 755 /etc/systemd/system/${OE_CONFIG}.service
 sudo chown root: /etc/systemd/system/${OE_CONFIG}.service
 
-
-
-if ss -tuln | grep -q ':$OE_PORT'; then
-  echo "Odoo ${OE_VERSION} installation completed. Access Odoo from your browser at http://your_IP_address:${OE_PORT}"
-else
-  echo "Odoo failed to start or is not listening on port: $OE_PORT"
-fi
 
 # Reload systemd and enable the service
 sudo systemctl daemon-reload
@@ -203,7 +216,6 @@ if ! sudo systemctl status ${OE_CONFIG}.service | grep -q "running"; then
     echo "Odoo failed to start. Check the logs for more details."
     exit 1
 fi
-
 
 # Final check for listening port
 if ss -tuln | grep -q ":$OE_PORT"; then
