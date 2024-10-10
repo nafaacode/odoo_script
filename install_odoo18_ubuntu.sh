@@ -60,23 +60,30 @@ sudo apt-get install -y python3-pip python3-dev libxml2-dev libxslt1-dev zlib1g-
 sudo ln -s /usr/bin/nodejs /usr/bin/node
 sudo npm install -g less less-plugin-clean-css
 sudo apt-get install -y node-less
-
+ 
 # Install PostgreSQL and create a new user for Odoo
-if [ $GENERATE_RANDOM_PASSWORD = "True" ]; then
+if [ "$GENERATE_RANDOM_PASSWORD" = "True" ]; then
     echo -e "\n---- Generating random db password ----"
     DB_PASSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
 fi
 
+# Create the .pgpass file
+echo -e "\n---- Setting up .pgpass file ----"
+PGPASSFILE="$HOME/.pgpass"
+echo "localhost:5432:*:$OE_USER:$DB_PASSWD" > $PGPASSFILE
+chmod 600 $PGPASSFILE
+
+# Install PostgreSQL
 echo -e "\n---- Install PostgreSQL and create a new user for Odoo ----"
 sudo apt-get install -y postgresql
-sudo  su - postgres -c "createuser --createdb --username postgres --no-createrole --superuser --pwprompt $OE_USER" 2> /dev/null || true
- 
+
+# Create the user with the generated or fixed password
+sudo -u postgres createuser --createdb --no-createrole --superuser $OE_USER
 sudo -u postgres psql -c "ALTER USER $OE_USER WITH PASSWORD '$DB_PASSWD';"
 
 # Check if the user exists
 if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$OE_USER'" | grep -q 1; then
-    # If the user exists, change their password
-    echo -e "\n---- New user PostgreSQL for Odoo created----"
+    echo -e "\n---- New user PostgreSQL for Odoo created ----"
 fi
 
 # Create a system user for Odoo and install Git to clone the Odoo source code
@@ -125,6 +132,10 @@ fi
 deactivate
 
 echo -e "\n---- Configure the Odoo instance ----"
+if [ $GENERATE_RANDOM_PASSWORD = "True" ]; then
+    echo -e "* Generating random admin password"
+    OE_SUPERADMIN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
+fi
 # Configure the Odoo instance
 sudo cp $OE_HOME_EXT/debian/odoo.conf /etc/${OE_CONFIG}.conf
 sudo bash -c "cat << EOF > /etc/${OE_CONFIG}.conf
