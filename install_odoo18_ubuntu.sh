@@ -28,6 +28,7 @@ INSTALL_WKHTMLTOPDF="True"  # Set to true if you want to install Wkhtmltopdf
 OE_PORT="8069"  # Default Odoo port
 IS_ENTERPRISE="False"  # Set to True if you want to install the Odoo enterprise version
 OE_SUPERADMIN="admin"  # Superadmin password
+DB_PASSWORD="123456" # for db_password
 GENERATE_RANDOM_PASSWORD="True"  # Generate random password
 OE_CONFIG="${OE_USER}"  # Odoo config name
 LONGPOLLING_PORT="8072"  # Default longpolling port
@@ -61,9 +62,22 @@ sudo npm install -g less less-plugin-clean-css
 sudo apt-get install -y node-less
 
 # Install PostgreSQL and create a new user for Odoo
+if [ $GENERATE_RANDOM_PASSWORD = "True" ]; then
+    echo -e "\n---- Generating random db password ----"
+    DB_PASSWD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
+fi
+
 echo -e "\n---- Install PostgreSQL and create a new user for Odoo ----"
 sudo apt-get install -y postgresql
 sudo  su - postgres -c "createuser --createdb --username postgres --no-createrole --superuser --pwprompt $OE_USER" 2> /dev/null || true
+ 
+sudo -u postgres psql -c "ALTER USER $OE_USER WITH PASSWORD '$DB_PASSWD';"
+
+# Check if the user exists
+if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$OE_USER'" | grep -q 1; then
+    # If the user exists, change their password
+    echo -e "\n---- New user PostgreSQL for Odoo created----"
+fi
 
 # Create a system user for Odoo and install Git to clone the Odoo source code
 sudo adduser --system --quiet --shell=/bin/bash --home=$OE_HOME --gecos 'ODOO' --group $OE_USER
@@ -116,11 +130,11 @@ sudo cp $OE_HOME_EXT/debian/odoo.conf /etc/${OE_CONFIG}.conf
 sudo bash -c "cat << EOF > /etc/${OE_CONFIG}.conf
 [options]
 ; This is the password that allows database operations:
-; admin_passwd = $OE_SUPERADMIN
+admin_passwd = $OE_SUPERADMIN
 db_host = localhost
 db_port = 5432
 db_user = $OE_USER
-db_password = 123456
+db_password = $DB_PASSWD
 addons_path = $OE_HOME_EXT/addons
 default_productivity_apps = True
 logfile = /var/log/odoo/${OE_CONFIG}.log
