@@ -96,27 +96,28 @@ sudo apt-get install -y git
 echo -e "\n==== Installing ODOO Server with user $OE_USER ===="
 sudo su - $OE_USER -c "git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/"
 
-# Install Python virtual environment and set up the Odoo environment
-echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
-sudo apt install -y python3-venv
-sudo python3 -m venv $OE_HOME_EXT/venv
-
-# Restart services using outdated libraries
+# Restart services using outdated libraries todo: check if necessary
 echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
 sudo systemctl restart packagekit.service
 sudo systemctl restart polkit.service
-sudo systemctl restart ssh.service
 sudo systemctl restart systemd-journald.service
 sudo systemctl restart systemd-networkd.service
 sudo systemctl restart systemd-resolved.service
 sudo systemctl restart systemd-timesyncd.service
 sudo systemctl restart systemd-udevd.service
 
+# Install Python virtual environment and set up the Odoo environment
+echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
+sudo apt install -y python3-venv
+sudo python3 -m venv $OE_HOME_EXT/venv
+
+
+
 
 # Activate the virtual environment and install required Python packages
 echo -e "\n---- Activate the virtual environment and install required Python packages ----"
 cd $OE_HOME_EXT/
-source venv/bin/activate
+source $OE_HOME_EXT/venv/bin/activate
 pip install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 
 # Install wkhtmltopdf and resolve any missing dependencies
@@ -128,8 +129,38 @@ if [ "$INSTALL_WKHTMLTOPDF" = "True" ]; then
     sudo dpkg -i wkhtmltox_0.12.5-1.bionic_amd64.deb
     sudo apt install -f -y
 fi
- 
+
+if [ $IS_ENTERPRISE = "True" ]; then
+    # Odoo Enterprise
+    sudo su $OE_USER -c "mkdir $OE_HOME/enterprise"
+    sudo su $OE_USER -c "mkdir $OE_HOME/enterprise/addons"
+
+    GITHUB_RESPONSE=$(sudo git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/enterprise "$OE_HOME/enterprise/addons" 2>&1)
+    while [[ $GITHUB_RESPONSE == *"Authentication"* ]]; do
+        echo "------------------------WARNING------------------------------"
+        echo "Your authentication with Github has failed! Please try again."
+        printf "In order to clone and install the Odoo enterprise version you \nneed to be an official Odoo partner and you need access to\nhttp://github.com/odoo/enterprise.\n"
+        echo "TIP: Press ctrl+c to stop this script."
+        echo "-------------------------------------------------------------"
+        echo " "
+        GITHUB_RESPONSE=$(sudo git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/enterprise "$OE_HOME/enterprise/addons" 2>&1)
+    done
+
+    echo -e "\n---- Added Enterprise code under $OE_HOME/enterprise/addons ----"
+    echo -e "\n---- Installing Enterprise specific libraries in virtual environment ----"
+    pip install psycopg2-binary pdfminer.six num2words ofxparse dbfread ebaysdk firebase_admin pyOpenSSL
+fi
+
+
 deactivate
+
+
+echo -e "\n---- Create custom addons directory ----"
+sudo su $OE_USER -c "mkdir $OE_HOME/custom"
+sudo su $OE_USER -c "mkdir $OE_HOME/custom/addons"
+
+echo -e "\n---- Setting permissions on home folder ----"
+sudo chown -R $OE_USER:$OE_USER $OE_HOME/*
 
 echo -e "\n---- Configure the Odoo instance ----"
 if [ $GENERATE_RANDOM_PASSWORD = "True" ]; then
