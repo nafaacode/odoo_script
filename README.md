@@ -1,13 +1,3 @@
-
-##### 1. Download the script:
-```
-sudo wget https://raw.githubusercontent.com/nafaacode/odoo_script/refs/heads/main/odoo_install_ubuntu.sh
-
-```
-
-##### 2. Modify the parameters
-
-
 # Odoo Installation Script for Ubuntu
 
 This script automates the installation of Odoo on Ubuntu servers. It sets up all necessary components, including PostgreSQL, Nginx, and SSL certificates, if required.
@@ -20,31 +10,37 @@ Nafaa Z
 - Make sure you have `sudo` privileges.
 
 ## Usage
+1. Download the script:
+```
+sudo wget https://raw.githubusercontent.com/nafaacode/odoo_script/refs/heads/main/odoo_install_ubuntu.sh
 
-1. **Create a new script file:**
+```
+2. **Create a new script file:**
    ```bash
    sudo nano install_odoo18_ubuntu.sh
    
-2. **Make the script executable:**
+3. **Make the script executable:**
 
    sudo chmod +x install_odoo18_ubuntu.sh
    
-3. **Run the script to install Odoo:**
+5. #####  Modify the parameters
+    
+6. **Run the script to install Odoo:**
    ./install_odoo18_ubuntu.sh
 
 **Before running the script, configure the following variables in the script:**
-
-OE_VERSION: The version of Odoo to install (default is "18.0").
-INSTALL_NGINX: Set to "True" if you want to install Nginx.
-WEBSITE_NAME: The domain name for your Odoo instance.
-ENABLE_SSL: Set to "True" to enable SSL.
-ADMIN_EMAIL: Email for SSL registration (should not be "odoo@example.com").
-INSTALL_POSTGRESQL_FOURTEEN: Set to "True" to install PostgreSQL 14.
-INSTALL_WKHTMLTOPDF: Set to "True" to install Wkhtmltopdf.
-IS_ENTERPRISE: Set to "True" to install the Odoo enterprise version.
-OE_SUPERADMIN: Superadmin password for Odoo.
-DB_PASSWORD: Database password (if not generating a random one).
-GENERATE_RANDOM_PASSWORD: Set to "True" to generate a random database password.
+ 
+```OE_VERSION```: The version of Odoo to install (default is "18.0").<br/>
+```INSTALL_NGINX```: Set to "True" if you want to install Nginx.<br/>
+```WEBSITE_NAME```: The domain name for your Odoo instance.<br/>
+```ENABLE_SSL```: Set to "True" to enable SSL.<br/>
+```ADMIN_EMAIL```: Email for SSL registration (should not be "odoo@example.com").<br/>
+```INSTALL_POSTGRESQL_FOURTEEN```: Set to "True" to install PostgreSQL 14.<br/>
+```INSTALL_WKHTMLTOPDF```: Set to "True" to install Wkhtmltopdf.<br/>
+```IS_ENTERPRISE```: Set to "True" to install the Odoo enterprise version.<br/>
+```OE_SUPERADMIN```: Superadmin password for Odoo.<br/>
+```DB_PASSWORD```: Database password (if not generating a random one).<br/>
+```GENERATE_RANDOM_PASSWORD```: Set to "True" to generate a random database password.<br/>
 
 **Notes**
 The script sets up a PostgreSQL database for Odoo and creates a system user.
