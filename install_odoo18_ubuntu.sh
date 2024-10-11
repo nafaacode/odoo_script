@@ -19,7 +19,7 @@
 OE_VERSION="18.0"  # Choose the Odoo version
 
 INSTALL_NGINX="False"  # Set to True if you want to install Nginx
-DOMAIN_NAME="_"  # Set the domain name
+WEBSITE_NAME="_"  # Set the domain name
 ENABLE_SSL="False"  # Enable SSL
 ADMIN_EMAIL="odoo@example.com"  # Email for SSL registration
 
