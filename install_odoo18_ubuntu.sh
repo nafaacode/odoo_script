@@ -347,6 +347,10 @@ if [ "$INSTALL_NGINX" = "True" ] && [ "$ENABLE_SSL" = "True" ] && [ "$ADMIN_EMAI
   sudo certbot --nginx -d "$WEBSITE_NAME" --noninteractive --agree-tos --email "$ADMIN_EMAIL" --redirect
   sudo service nginx reload
   echo "SSL/HTTPS is enabled!"
+  # Add cron job for certificate renewal
+  (sudo crontab -l 2>/dev/null; echo "15 3 * * * /usr/bin/certbot renew --pre-hook 'systemctl stop nginx' --post-hook 'systemctl start nginx'") | sudo crontab -
+
+  
 else
   echo "SSL/HTTPS isn't enabled due to user choice or misconfiguration!"
   if [ "$ADMIN_EMAIL" = "odoo@example.com" ]; then
