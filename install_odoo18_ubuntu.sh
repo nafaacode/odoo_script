@@ -368,7 +368,7 @@ fi
 
 # Start the Odoo service
 echo -e "\n---- Start the Odoo service ----"
-sudo systemctl start ${OE_CONFIG}.service
+sudo systemctl restart ${OE_CONFIG}.service
 
 sleep 5
 
