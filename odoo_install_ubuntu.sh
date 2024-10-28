@@ -18,14 +18,12 @@
 ### VARIABLES ###
 OE_VERSION="18.0"  # Choose the Odoo version
 
-
 INSTALL_NGINX="False"  # Set to True if you want to install Nginx
 WEBSITE_NAME="_"  # Set the domain name
 ENABLE_SSL="False"  # Enable SSL
 ADMIN_EMAIL="odoo@example.com"  # Email for SSL registration
-POSTGRES_VERSION="14"  # Choose the PostgreSQL version
-INSTALL_POSTGRESQL_FOURTEEN="True"  # Install PostgreSQL V14
 
+INSTALL_POSTGRESQL_FOURTEEN="True"  # Install PostgreSQL V14
 MAJOR_VERSION=${OE_VERSION%%.*}
 OE_USER="odoo${MAJOR_VERSION}"
 OE_HOME="/opt/$OE_USER"
@@ -38,6 +36,7 @@ DB_PASSWORD="123456" # for db_password
 GENERATE_RANDOM_PASSWORD="True"  # Generate random password
 OE_CONFIG="${OE_USER}"  # Odoo config name
 LONGPOLLING_PORT="8072"  # Default longpolling port
+
 
 # Get the Ubuntu version
 version=$(lsb_release -rs)
@@ -79,7 +78,7 @@ chmod 600 $PGPASSFILE
 
 # Install PostgreSQL
 echo -e "\n---- Install PostgreSQL and create a new user for Odoo ----"
-sudo apt-get install -y postgresql-$POSTGRES_VERSION
+sudo apt-get install -y postgresql
 
 # Create the user with the generated or fixed password
 sudo -u postgres createuser --createdb --no-createrole --superuser $OE_USER
@@ -114,6 +113,9 @@ sudo systemctl restart systemd-udevd.service
 echo -e "\n---- Install Python virtual environment and set up the Odoo environment ----"
 sudo apt install -y python3-venv
 sudo python3 -m venv $OE_HOME_EXT/venv
+
+
+
 
 # Activate the virtual environment and install required Python packages
 echo -e "\n---- Activate the virtual environment and install required Python packages ----"
@@ -152,7 +154,9 @@ if [ $IS_ENTERPRISE = "True" ]; then
     pip install psycopg2-binary pdfminer.six num2words ofxparse dbfread ebaysdk firebase_admin pyOpenSSL
 fi
 
+
 deactivate
+
 
 echo -e "\n---- Create custom addons directory ----"
 sudo su $OE_USER -c "mkdir $OE_HOME/custom"
@@ -171,67 +175,213 @@ fi
 sudo cp $OE_HOME_EXT/debian/odoo.conf /etc/${OE_CONFIG}.conf
 sudo bash -c "cat << EOF > /etc/${OE_CONFIG}.conf
 [options]
-; This is the configuration file for Odoo
-; You can customize the configuration options as needed
-; You can find more options in the Odoo documentation
-addons_path = ${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons,${OE_HOME}/enterprise/addons
+; This is the password that allows database operations:
 admin_passwd = $OE_SUPERADMIN
-dbfilter = ^%d
-http_port = ${OE_PORT}
-longpolling_port = ${LONGPOLLING_PORT}
-workers = 0
-limit_memory_hard = 26843545600
-limit_memory_soft = 21474836480
-max_cron_threads = 2
-logfile = /var/log/odoo/odoo.log
-logrotate = True
-; PostgreSQL settings
+db_host = localhost
+db_port = 5432
 db_user = $OE_USER
 db_password = $DB_PASSWD
-db_host = False
-db_port = 5432
-db_sslmode = require  # Enable SSL for PostgreSQL
+addons_path = $OE_HOME_EXT/addons
+default_productivity_apps = True
+logfile = /var/log/odoo/${OE_CONFIG}.log
 EOF"
 
-# Create the log directory and set permissions
-echo -e "\n---- Creating log directory and setting permissions ----"
+# Replace http_port ou xmlrpc_port 
+if [ "$OE_VERSION" > "11.0" ]; then
+    # Replace or add http_port
+    sudo sed -i "/^http_port/c\http_port = $OE_PORT" /etc/${OE_CONFIG}.conf || echo "http_port = $OE_PORT" | sudo tee -a /etc/${OE_CONFIG}.conf
+else
+    # Replace or add xmlrpc_port
+    sudo sed -i "/^xmlrpc_port/c\xmlrpc_port = $OE_PORT" /etc/${OE_CONFIG}.conf || echo "xmlrpc_port = $OE_PORT" | sudo tee -a /etc/${OE_CONFIG}.conf
+fi
+
+if [ $IS_ENTERPRISE = "True" ]; then
+    # Replace or add  
+    sudo sed -i "/^addons_path/c\addons_path = ${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons" /etc/${OE_CONFIG}.conf || echo "addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons" | sudo tee -a /etc/${OE_CONFIG}.conf
+    sudo su root -c "printf 'addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons\n' >> /etc/${OE_CONFIG}.conf"
+else
+    sudo sed -i "/^addons_path/c\addons_path = ${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons" /etc/${OE_CONFIG}.conf || echo "addons_path = ${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons" | sudo tee -a /etc/${OE_CONFIG}.conf
+fi
+
+echo -e "\n---- Set correct permissions on the Odoo configuration file ----"
+# Set correct permissions on the Odoo configuration file
+sudo chown $OE_USER: /etc/${OE_CONFIG}.conf
+sudo chmod 640 /etc/${OE_CONFIG}.conf
+
+# Create a directory for Odoo log files and set appropriate ownership
 sudo mkdir /var/log/odoo
-sudo chown $OE_USER:$OE_USER /var/log/odoo
+sudo chown $OE_USER:root /var/log/odoo
 
-# Install and configure Nginx
-if [ "$INSTALL_NGINX" = "True" ]; then
-    echo -e "\n---- Install and configure Nginx ----"
-    sudo apt-get install -y nginx
-    sudo systemctl enable nginx
-    sudo systemctl start nginx
+echo -e "\n---- Create a systemd service file for Odoo ----"
+# Create a systemd service file for Odoo
+sudo bash -c "cat << EOF > /etc/systemd/system/${OE_CONFIG}.service
+[Unit]
+Description=Odoo
+Documentation=http://www.odoo.com
+After=network.target
 
-    # Nginx configuration
-    sudo bash -c "cat << EOF > /etc/nginx/sites-available/$WEBSITE_NAME
-server {
-    listen 80;
-    server_name $WEBSITE_NAME;
+[Service]
+Type=simple
+User=$OE_USER
+ExecStart=$OE_HOME_EXT/venv/bin/python3 $OE_HOME_EXT/odoo-bin -c /etc/${OE_CONFIG}.conf
+Restart=always
 
-    location / {
-        proxy_pass http://127.0.0.1:${OE_PORT};
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-
+[Install]
+WantedBy=default.target
 EOF"
 
-    sudo ln -s /etc/nginx/sites-available/$WEBSITE_NAME /etc/nginx/sites-enabled/
-    sudo systemctl restart nginx
+# Set permissions and ownership on the systemd service file
+sudo chmod 755 /etc/systemd/system/${OE_CONFIG}.service
+sudo chown root: /etc/systemd/system/${OE_CONFIG}.service
+
+
+# Reload systemd and enable the service
+sudo systemctl daemon-reload
+sudo systemctl enable ${OE_CONFIG}.service
+
+
+
+#--------------------------------------------------
+# Install Nginx if needed
+#--------------------------------------------------
+if [ "$INSTALL_NGINX" = "True" ]; then
+  echo -e "\n---- Installing and setting up Nginx ----"
+  sudo apt install nginx -y
+
+  cat <<EOF > ~/odoo
+server {
+  listen 80;
+
+  # Set proper server name after domain set
+  server_name $WEBSITE_NAME;
+
+  # Add headers for Odoo proxy mode
+  proxy_set_header X-Forwarded-Host \$host;
+  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto \$scheme;
+  proxy_set_header X-Real-IP \$remote_addr;
+  add_header X-Frame-Options "SAMEORIGIN";
+  add_header X-XSS-Protection "1; mode=block";
+  proxy_set_header X-Client-IP \$remote_addr;
+  proxy_set_header HTTP_X_FORWARDED_HOST \$remote_addr;
+
+  # Odoo log files
+  access_log  /var/log/nginx/$OE_USER-access.log;
+  error_log   /var/log/nginx/$OE_USER-error.log;
+
+  # Increase proxy buffer size
+  proxy_buffers 16 64k;
+  proxy_buffer_size 128k;
+
+  proxy_read_timeout 900s;
+  proxy_connect_timeout 900s;
+  proxy_send_timeout 900s;
+
+  # Force timeouts if the backend dies
+  proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+
+  types {
+    text/less less;
+    text/scss scss;
+  }
+
+  # Enable data compression
+  gzip on;
+  gzip_min_length 1100;
+  gzip_buffers 4 32k;
+  gzip_types text/css text/less text/plain text/xml application/xml application/json application/javascript application/pdf image/jpeg image/png;
+  gzip_vary on;
+  client_header_buffer_size 4k;
+  large_client_header_buffers 4 64k;
+  client_max_body_size 0;
+
+  location / {
+    proxy_pass http://127.0.0.1:$OE_PORT;
+    # By default, do not forward anything
+    proxy_redirect off;
+  }
+
+  location /longpolling {
+    proxy_pass http://127.0.0.1:$LONGPOLLING_PORT;
+  }
+
+  location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+    expires 2d;
+    proxy_pass http://127.0.0.1:$OE_PORT;
+    add_header Cache-Control "public, no-transform";
+  }
+
+  # Cache some static data in memory for 60 minutes
+  location ~ /[a-zA-Z0-9_-]*/static/ {
+    proxy_cache_valid 200 302 60m;
+    proxy_cache_valid 404 1m;
+    proxy_buffering on;
+    expires 864000;
+    proxy_pass http://127.0.0.1:$OE_PORT;
+  }
+}
+EOF
+
+  sudo mv ~/odoo /etc/nginx/sites-available/$WEBSITE_NAME
+  sudo ln -s /etc/nginx/sites-available/$WEBSITE_NAME /etc/nginx/sites-enabled/$WEBSITE_NAME
+  sudo rm /etc/nginx/sites-enabled/default
+  sudo service nginx reload
+  sudo su root -c "printf 'proxy_mode = True\n' >> /etc/${OE_CONFIG}.conf"
+  echo "Done! The Nginx server is up and running. Configuration can be found at /etc/nginx/sites-available/$WEBSITE_NAME"
+else
+  echo "Nginx isn't installed due to user choice!"
+fi
+
+
+#--------------------------------------------------
+# Enable ssl with certbot
+#--------------------------------------------------
+
+if [ "$INSTALL_NGINX" = "True" ] && [ "$ENABLE_SSL" = "True" ] && [ "$ADMIN_EMAIL" != "odoo@example.com" ] && [ "$WEBSITE_NAME" != "_" ]; then
+  sudo apt-get update -y
+  sudo apt install snapd -y
+  sudo snap install core
+  sudo snap refresh core
+  sudo snap install --classic certbot
+  sudo apt-get install python3-certbot-nginx -y
+  sudo certbot --nginx -d "$WEBSITE_NAME" --noninteractive --agree-tos --email "$ADMIN_EMAIL" --redirect
+  sudo service nginx reload
+  echo "SSL/HTTPS is enabled!"
+  # Add cron job for certificate renewal
+  (sudo crontab -l 2>/dev/null; echo "15 3 * * * /usr/bin/certbot renew --pre-hook 'systemctl stop nginx' --post-hook 'systemctl start nginx'") | sudo crontab -
+
+  
+else
+  echo "SSL/HTTPS isn't enabled due to user choice or misconfiguration!"
+  if [ "$ADMIN_EMAIL" = "odoo@example.com" ]; then
+    echo "Certbot does not support registering odoo@example.com. You should use a real email address."
+  fi
+  if [ "$WEBSITE_NAME" = "_" ]; then
+    echo "Website name is set as _. Cannot obtain SSL Certificate for _. You should use a real website address."
+  fi
+fi
+
+
+if [ $INSTALL_NGINX = "True" ]; then
+  echo "Nginx configuration file: /etc/nginx/sites-available/$WEBSITE_NAME"
 fi
 
 # Start the Odoo service
 echo -e "\n---- Start the Odoo service ----"
-sudo cp $OE_HOME_EXT/debian/odoo.service /etc/systemd/system/${OE_CONFIG}.service
-sudo systemctl restart ${OE_CONFIG}
-sudo systemctl enable ${OE_CONFIG}
+sudo systemctl restart ${OE_CONFIG}.service
 
-echo -e "\n---- Odoo has been successfully installed and started! ----"
-echo -e "You can access it at http://<your_domain_or_IP>:${OE_PORT}/"
-echo -e "Your admin password is: $OE_SUPERADMIN"
+sleep 5
+
+# Check the status of the Odoo service
+if ! sudo systemctl status ${OE_CONFIG}.service | grep -q "running"; then
+    echo "Odoo failed to start. Check the logs for more details."
+    exit 1
+fi
+
+# Final check for listening port
+if ss -tuln | grep -q ":$OE_PORT"; then
+  echo "Odoo ${OE_VERSION} installation completed. Access Odoo from your browser at http://your_IP_address:${OE_PORT}"
+else
+  echo "Odoo failed to start or is not listening on port: $OE_PORT"
+  exit 1
+fi
